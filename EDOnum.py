@@ -28,6 +28,24 @@ def fixed_point_approx(initial_guess:float,
     return approx[-1]
 
 @curry
+def edo_approx_multistep(y:list, f:list, h:float, method:str):
+    
+    # EXPLICIT METHODS
+    if method == "hw4-method":
+        y_k = y[-1] + h*(-f[-3] + (3/2)*f[-2] + (1/2)*f[-1])
+    
+    elif method == "AB-2":
+        y_k = y[-1] + (h/2)*(3*f[-1] -f[-2])
+    
+    elif method == "Leap-Frog":
+        y_k = y[-2] + 2*h*f[-1]
+    
+    else:
+        raise Exception(f"Invalid value '{method}' for parameter method")
+    
+    return y_k.flatten()
+
+@curry
 def edo_approx(y_k:float, 
                h:float, 
                t:float, 
@@ -80,7 +98,7 @@ def edo_approx(y_k:float,
     else:
         raise Exception(f"Invalid value '{method}' for parameter method")
     
-    return y_k1
+    return y_k1.flatten()
 
 
 
@@ -111,6 +129,47 @@ class EDONumSol:
         for k in range(1,n+1):
             y.append(y_approx_func(y[-1],h,t[-1]))
             t.append(t[0] + k*h)
+            
+        return t,y
+    
+    def solve_multistep(self, 
+                        nsteps, 
+                        method, 
+                        t_0 = None, 
+                        t_f = None, 
+                        y_0 = None,
+                        h = None, 
+                        t_init=None, 
+                        y_init=None, 
+                        initialization_method = "runge-kutta"):
+        
+        input_params = [t_0,t_f,y_0,h]
+        params = [self.t_0,self.t_f,self.y_0,self.h]
+        t_0,t_f,y_0,h = [s if p==None else p for s,p in zip(params,input_params)] 
+            
+        
+        y = [y_0]
+        t = [t_0]
+        n = int((t_f - t_0)/ h)
+        
+        #initialization
+        if (t_init == None) or (y_init==None):
+            t_f = self.t_0 + (nsteps-1)*self.h
+            t,y = self.solve(t_f = t_f, method = initialization_method)
+        else:
+            t = t_init.copy()
+            y = y_init.copy()
+        
+        print(t)
+        print(y)
+        f = [self.y_dot(t_,y_).flatten() for t_,y_ in zip(t,y)]
+        
+        for k in range(nsteps,n+1):
+            y.append(edo_approx_multistep(y, f, h, method))
+            t.append(t[0] + k*h)
+            
+            f.pop(0)
+            f.append(self.y_dot(t[-1],y[-1]))
             
         return t,y
     
@@ -166,4 +225,3 @@ class EDONumSol:
             out_cols += [f"error_var{i}" for i in range(self.num_var)] + [f"p_var{i}" for i in range(self.num_var)] 
             
         return conv_table[out_cols]
-        
